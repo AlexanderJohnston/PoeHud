@@ -19,35 +19,35 @@ namespace PoeHUD.Poe
 			get
 			{
 				Dictionary<int, Entity> dictionary = new Dictionary<int, Entity>();
-				this.CollectEntities(this.m.ReadInt(this.address + 12), dictionary);
+				this.CollectEntities(this.M.ReadInt(this.Address + 12), dictionary);
 				return dictionary;
 			}
 		}
 		private void CollectEntities(int addr, Dictionary<int, Entity> list)
 		{
 			int num = addr;
-			addr = this.m.ReadInt(addr + 4);
+			addr = this.M.ReadInt(addr + 4);
 			HashSet<int> hashSet = new HashSet<int>();
 			Queue<int> queue = new Queue<int>();
 			queue.Enqueue(addr);
 			while (queue.Count > 0)
 			{
-				int num2 = queue.Dequeue();
-				if (!hashSet.Contains(num2))
+				int nextAddr = queue.Dequeue();
+				if (hashSet.Contains(nextAddr)) 
+					continue;
+
+				hashSet.Add(nextAddr);
+				if (this.M.ReadByte(nextAddr + 21) == 0 && nextAddr != num && nextAddr != 0)
 				{
-					hashSet.Add(num2);
-					if (this.m.ReadByte(num2 + 21) == 0 && num2 != num && num2 != 0)
+					int key = this.M.ReadInt(nextAddr + 12);
+					if (!list.ContainsKey(key))
 					{
-						int key = this.m.ReadInt(num2 + 12);
-						if (!list.ContainsKey(key))
-						{
-							int address = this.m.ReadInt(num2 + 16);
-							Entity @object = base.GetObject<Entity>(address);
-							list.Add(key, @object);
-						}
-						queue.Enqueue(this.m.ReadInt(num2));
-						queue.Enqueue(this.m.ReadInt(num2 + 8));
+						int address = this.M.ReadInt(nextAddr + 16);
+						Entity @object = base.GetObject<Entity>(address);
+						list.Add(key, @object);
 					}
+					queue.Enqueue(this.M.ReadInt(nextAddr));
+					queue.Enqueue(this.M.ReadInt(nextAddr + 8));
 				}
 			}
 		}

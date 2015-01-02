@@ -16,6 +16,7 @@ namespace PoeHUD.Poe
 		public int AreaChangeCount;
 		public int Fullbright1;
 		public int Fullbright2;
+		public int ParticlesCode;
 
 
 		public static Offsets Regular = new Offsets { IgsOffset = 0, IgsDelta = 0, ExeName = "PathOfExile" };
@@ -30,21 +31,18 @@ namespace PoeHUD.Poe
 			Fullbright2 = 8217084;
 		*/
 
-        // 51 8B 46 68 8B 08 68 00 20 00 00 8D 54 24 04 52 6A 00 6A 00 50 8B 41 2C FF D0 8B 46 48 3B 46 4C
+
 		private static Pattern maphackPattern = new Pattern(new byte[]
 		{
 			81, 139, 70, 104, 139, 8, 104, 0, 32, 0, 0, 141, 84, 36, 4, 82, 
 			106, 0, 106, 0, 80, 139, 65, 44, 255, 208, 139, 70, 72, 59, 70, 76 
 		}, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-
-        // 55 8B EC 83 E4 F8 8B 45 0C 83 EC 2C 80 38 00 53 56 57 8B D9 0F 85 E9 00 00 00 83 BB
+		
 		private static Pattern zoomhackPattern = new Pattern(new byte[]
 		{
 			85, 139, 236, 131, 228, 248, 139, 69, 12, 131, 236, 44, 128, 56, 0, 83, 
 			86, 87, 139, 217, 15, 133, 233, 0, 0, 0, 131, 187
 		}, "xxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-
-        //55 8B EC 83 E4 F8 6A FF 68 ?? ?? ?? ?? 64 A1 00 00 00 00 50 64 89 25 00 00 00 00 81 EC A0 00 00 00 53 8B 5D 10 C7 44 24 44 00 00 00 00 8B
 		private static Pattern fullbrightPattern = new Pattern(new byte[]
 		{
 			85, 139, 236, 131, 228, 248, 106, 255, 104, 0, 0, 0, 0, 100, 161, 0,
@@ -52,30 +50,55 @@ namespace PoeHUD.Poe
 			0, 83, 139, 93, 16, 199, 68, 36, 68, 0, 0, 0, 0, 139
 		}, "xxxxxxxxx????xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
-        //64 A1 00 00 00 00 6A FF 68 ?? ?? ?? ?? 50 64 89 25 00 00 00 00 A1 ?? ?? ?? ?? 81 EC 90 00 00 00 53 55 56 57 33 FF 3B C7 - 1.2.3b
-        //64 A1 00 00 00 00 6A FF 68 ?? ?? ?? ?? 50 64 89 25 00 00 00 00 A1 ?? ?? ?? ?? 81 EC C8 00 00 00 53 55 33 DB 56 57 3B C3 - 1.2.4
+		/* 
+			64 A1 00 00 00 00          mov     eax, large fs:0
+			6A FF                      push    0FFFFFFFFh
+			68 90 51 4D 01             push    offset SEH_10D6970
+			50                         push    eax
+			64 89 25 00 00 00 00       mov     large fs:0, esp
+			A1 EC 6A 70 01             mov     eax, off_1706AEC ; <--- BP IS HERE
+			81 EC C8 00 00 00          sub     esp, 0C8h
+			53                         push    ebx
+			55                         push    ebp
+			33 DB                      xor     ebx, ebx
+			56                         push    esi
+			57                         push    edi
+			3B C3                      cmp     eax, ebx
+		 */
+
 		private static Pattern basePtrPattern = new Pattern(new byte[]
 		{
 			100, 161, 0, 0, 0, 0, 106, 255, 104, 0, 0, 0, 0, 80, 100, 137,
-			37, 0, 0, 0, 0, 161, 0, 0, 0, 0, 129, 236, 144, 0, 0, 0,
-			83, 85, 51, 219, 86, 87, 59, 195
-
+			37, 0, 0, 0, 0, 161, 0, 0, 0, 0, 129, 236, 0xC8, 0, 0, 0,
+			0x53, 0x55, 0x33, 0xDB, 0x56, 0x57, 0x3B, 0xC3
 		}, "xxxxxxxxx????xxxxxxxxx????xxxxxxxxxxxxxx");
-
-        //6A FF 68 ?? ?? ?? ?? 64 A1 00 00 00 00 50 64 89 25 00 00 00 00 83 EC 30 FF 05 ?? ?? ?? ?? 53 55 8B 2D ?? ?? ?? ?? 56 B8
 		private static Pattern fileRootPattern = new Pattern(new byte[]
 		{
 			106, 255, 104, 0, 0, 0, 0, 100, 161, 0, 0, 0, 0, 80, 100, 137,
 			37, 0, 0, 0, 0, 131, 236, 48, 255, 5, 0, 0, 0, 0, 83, 85,
 			139, 45, 0, 0, 0, 0, 86, 184
 		}, "xxx????xxxxxxxxxxxxxxxxxxx????xxxx????xx");
-
-        //8B 09 89 08 85 C9 74 0C FF 41 28 8B 15  89 51 24 C3 CC
 		private static Pattern areaChangePattern = new Pattern(new byte[]
 		{
 			139, 9, 137, 8, 133, 201, 116, 12, 255, 65, 40, 139, 21, 0, 0, 0,
 			0, 137, 81, 36, 195, 204
 		}, "xxxxxxxxxxxxx????xxxxx");
+
+
+		/*
+			80 7E 48 00             cmp     byte ptr [esi+48h], 0
+			0F 85 A4 01 00 00       jnz     loc_542F41					; we catch the last 00 byte into pattern to match 4-bytes step
+			8B 46 08                mov     eax, [esi+8]
+			80 B8 1C 01 00 00 00    cmp     byte ptr [eax+11Ch], 0
+			75 12                   jnz     short loc_542DBB
+		 */
+		private static Pattern particlePattern = new Pattern(new byte[]
+		{
+			0x00, 0x8B, 0, 0, 0x80, 0xB8, 0, 0, 0, 0, 0x00, 0x75, 0x12
+		}, "xx??xx????xxx");
+
+
+
 		public void DoPatternScans(Memory m)
 		{
 			int[] array = m.FindPatterns(new Pattern[]
@@ -85,15 +108,17 @@ namespace PoeHUD.Poe
 				Offsets.fullbrightPattern,
 				Offsets.basePtrPattern,
 				Offsets.fileRootPattern,
-				Offsets.areaChangePattern
+				Offsets.areaChangePattern,
+				Offsets.particlePattern
 			});
 			MaphackFunc = array[0];
 			ZoomHackFunc = array[1] + 247;
-			Fullbright1 = m.ReadInt(m.BaseAddress + array[2] + 1487) - m.BaseAddress;
-			Fullbright2 = m.ReadInt(m.BaseAddress + array[2] + 1573) - m.BaseAddress;
-			Base = m.ReadInt(m.BaseAddress + array[3] + 80) - m.BaseAddress;
+			Fullbright1 = m.ReadInt(m.BaseAddress + array[2] + 0x600) - m.BaseAddress;
+			Fullbright2 = m.ReadInt(m.BaseAddress + array[2] + 0x656) - m.BaseAddress;
+			Base = m.ReadInt(m.BaseAddress + array[3] + 22) - m.BaseAddress;
 			FileRoot = m.ReadInt(m.BaseAddress + array[4] + 40) - m.BaseAddress;
 			AreaChangeCount = m.ReadInt(m.BaseAddress + array[5] + 13) - m.BaseAddress;
+			ParticlesCode = m.BaseAddress + array[6] - 5;
 		}
 	}
 }

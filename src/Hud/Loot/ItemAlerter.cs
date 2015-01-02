@@ -3,87 +3,129 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using PoeHUD.ExileBot;
+using PoeHUD.Controllers;
 using PoeHUD.Framework;
-using PoeHUD.Game;
-using PoeHUD.Hud.Icons;
 using PoeHUD.Poe.EntityComponents;
 using PoeHUD.Poe.UI;
+using PoeHUD.Settings;
 using SlimDX.Direct3D9;
 using Entity = PoeHUD.Poe.Entity;
 
 namespace PoeHUD.Hud.Loot
 {
-	public class ItemAlerter : HUDPlugin
+	public class ItemAlerter : HUDPluginBase, EntityListObserver, HUDPluginWithMapIcons
 	{
 		private HashSet<long> playedSoundsCache;
-		private Dictionary<ExileBot.Entity, AlertDrawStyle> currentAlerts;
+		private Dictionary<EntityWrapper, AlertDrawStyle> currentAlerts;
+
 		private Dictionary<string, CraftingBase> craftingBases;
 		private HashSet<string> currencyNames;
+
+		public class ItemAlertSettings : SettingsForModule
+		{
+			public Setting<bool> PlaySound = new Setting<bool>("Play Sound", true);
+			public Setting<bool> AlertOfCraftingBases = new Setting<bool>("Crafting Bases", true);
+			public Setting<bool> ShowText = new Setting<bool>("Show Text", true);
+			public SettingIntRange TextFontSize = new SettingIntRange("Font Size", 7, 30, 14);
+			public Setting<bool> AlertOfRares = new Setting<bool>("Rares", true);
+			public Setting<bool> AlertOfUniques = new Setting<bool>("Uniques", true);
+			public Setting<bool> AlertOfMaps = new Setting<bool>("Maps", true);
+			public ItemAlertSocketSettings Sockets = new ItemAlertSocketSettings();
+			public MinQualitySetting AlertOfGems = new MinQualitySetting("Skill Gems");
+			public MinQualitySetting AlertOfFlasks = new MinQualitySetting("Flasks", false);
+			public Setting<bool> AlertOfCurrency = new Setting<bool>("Currency", true);
+			
+			public ItemAlertSettings() : base("Item Alert") {}
+		}
+
+		public class MinQualitySetting : SettingsForModule
+		{
+			public MinQualitySetting(string name, bool enabled = true) : base(name)
+			{
+				Enabled.Value = enabled;
+			}
+
+			public SettingIntRange MinQuality = new SettingIntRange("Minimum Quality", 0, 20);
+		}
+
+		public class ItemAlertSocketSettings : SettingsBlock
+		{
+			public ItemAlertSocketSettings() : base("Sockets") { }
+
+			public SettingIntRange MinLinksToAlert = new SettingIntRange("Minimum Links", 2, 6, 5);
+			public Setting<bool> AlertOfRgb = new Setting<bool>("Chrome Link", true);
+			public SettingIntRange MinSocketsToAlert = new SettingIntRange("Minimum Sockets", 1, 6, 6);
+		}
+
+		public ItemAlertSettings Settings = new ItemAlertSettings();
 		public override void OnEnable()
 		{
-			this.playedSoundsCache = new HashSet<long>();
-			this.currentAlerts = new Dictionary<ExileBot.Entity, AlertDrawStyle>();
-			this.currencyNames = this.LoadCurrency();
-			this.craftingBases = this.LoadCraftingBases();
-			this.poe.Area.OnAreaChange += this.CurrentArea_OnAreaChange;
-			this.poe.EntityList.OnEntityAdded += this.EntityList_OnEntityAdded;
-			this.poe.EntityList.OnEntityRemoved += this.EntityList_OnEntityRemoved;
+			playedSoundsCache = new HashSet<long>();
+			currentAlerts = new Dictionary<EntityWrapper, AlertDrawStyle>();
+			currencyNames = LoadCurrency("config/currency.txt");
+			craftingBases = CraftingBase.LoadFromFile("config/crafting_bases.txt");
 		}
-		public override void OnDisable()
+
+		public override SettingsForModule SettingsNode
 		{
+			get { return Settings; }
 		}
-		private void EntityList_OnEntityRemoved(ExileBot.Entity entity)
+
+		public void EntityRemoved(EntityWrapper entity)
 		{
-			if (this.currentAlerts.ContainsKey(entity))
-			{
-				this.currentAlerts.Remove(entity);
-			}
+			currentAlerts.Remove(entity);
 		}
-		private void EntityList_OnEntityAdded(ExileBot.Entity entity)
+
+		public void EntityAdded(EntityWrapper entity)
 		{
-			if (!Settings.GetBool("ItemAlert") || this.currentAlerts.ContainsKey(entity))
+			if (!Settings.Enabled || currentAlerts.ContainsKey(entity))
 			{
 				return;
 			}
-			if (entity.HasComponent<WorldItem>())
-			{
-				ExileBot.Entity item = new ExileBot.Entity(this.poe, entity.GetComponent<WorldItem>().ItemEntity);
-				ItemUsefulProperties props = this.EvaluateItem(item);
+			if (!entity.HasComponent<WorldItem>()) return;
 
-				if (props.IsWorthAlertingPlayer(currencyNames))
-				{
-					this.DoAlert(entity, props);
-				}
+			EntityWrapper item = new EntityWrapper(model, entity.GetComponent<WorldItem>().ItemEntity);
+			ItemUsefulProperties props = EvaluateItem(item);
+
+			if (!props.IsWorthAlertingPlayer(Settings, currencyNames)) return;
+
+			AlertDrawStyle drawStyle = props.GetDrawStyle();
+			currentAlerts.Add(entity, drawStyle);
+			drawStyle.IconForMap = new MapIcon(entity, new HudTexture("minimap_default_icon.png", drawStyle.color), 8) { Type = MapIcon.IconType.Item };
+
+			if (Settings.PlaySound && drawStyle.soundToPlay != null && !playedSoundsCache.Contains(entity.LongId))
+			{
+				playedSoundsCache.Add(entity.LongId);
+				drawStyle.soundToPlay.Play();
 			}
 		}
 
 
-		private ItemUsefulProperties EvaluateItem(ExileBot.Entity item)
+		private ItemUsefulProperties EvaluateItem(EntityWrapper item)
 		{
 			ItemUsefulProperties ip = new ItemUsefulProperties();
 
 			Mods mods = item.GetComponent<Mods>();
 			Sockets socks = item.GetComponent<Sockets>();
 			Map map = item.HasComponent<Map>() ? item.GetComponent<Map>() : null;
-			SkillGem sk = item.HasComponent<SkillGem>() ? item.GetComponent<SkillGem>() : null;
 			Quality q = item.HasComponent<Quality>() ? item.GetComponent<Quality>() : null;
 
-			ip.Name = this.poe.Files.BaseItemTypes.Translate(item.Path);
+			ip.Name = model.Files.BaseItemTypes.Translate(item.Path);
 			ip.ItemLevel = mods.ItemLevel;
 			ip.NumLinks = socks.LargestLinkSize;
 			ip.NumSockets = socks.NumberOfSockets;
 			ip.Rarity = mods.ItemRarity;
 			ip.MapLevel = map == null ? 0 : 1;
 			ip.IsCurrency = item.Path.Contains("Currency");
-			ip.IsSkillGem = sk != null;
+			ip.IsSkillGem = item.HasComponent<SkillGem>();
+			ip.IsFlask = item.HasComponent<Flask>();
 			ip.Quality = q == null ? 0 : q.ItemQuality;
 			ip.WorthChrome = socks != null && socks.IsRGB;
 
 			ip.IsVaalFragment = item.Path.Contains("VaalFragment");
 
 			CraftingBase craftingBase;
-			if (craftingBases.TryGetValue(ip.Name, out craftingBase) && Settings.GetBool("ItemAlert.Crafting"))
+			if (craftingBases.TryGetValue(ip.Name, out craftingBase) && Settings.AlertOfCraftingBases)
 				ip.IsCraftingBase = ip.ItemLevel >= craftingBase.MinItemLevel 
 					&& ip.Quality >= craftingBase.MinQuality
 					&& (craftingBase.Rarities == null || craftingBase.Rarities.Contains(ip.Rarity));
@@ -91,50 +133,23 @@ namespace PoeHUD.Hud.Loot
 			return ip;
 		}
 
-		private void DoAlert(ExileBot.Entity entity, ItemUsefulProperties ip)
+		public override void OnAreaChange(AreaController area)
 		{
-			AlertDrawStyle drawStyle = ip.GetDrawStyle();
-			this.currentAlerts.Add(entity, drawStyle);
-			this.overlay.MinimapRenderer.AddIcon(new ItemMinimapIcon(entity, "minimap_default_icon.png", drawStyle.color, 8));
-			if (Settings.GetBool("ItemAlert.PlaySound") && !this.playedSoundsCache.Contains(entity.LongId))
-			{
-				this.playedSoundsCache.Add(entity.LongId);
-				Sounds.AlertSound.Play();
-			}
+			playedSoundsCache.Clear();
 		}
-		private void CurrentArea_OnAreaChange(AreaController area)
+		public override void Render(RenderingContext rc, Dictionary<UiMountPoint, Vec2> mountPoints)
 		{
-			this.playedSoundsCache.Clear();
-		}
-		public override void Render(RenderingContext rc)
-		{
-			if (!Settings.GetBool("ItemAlert") || !Settings.GetBool("ItemAlert.ShowText"))
-			{
-				return;
-			}
-			var mm = this.poe.Internal.game.IngameState.IngameUi.Minimap.SmallMinimap;
-			var qt = this.poe.Internal.game.IngameState.IngameUi.QuestTracker;
-			Rect miniMapRect = mm.GetClientRect();
-			Rect qtRect = qt.GetClientRect();
+			if (!Settings.ShowText) return;
 
-			Rect clientRect;
-			if (qt.IsVisible && qtRect.X + qt.Width < miniMapRect.X + miniMapRect.X + 50)
-				clientRect = qtRect;
-			else
-				clientRect = miniMapRect;
+			var playerPos = model.Player.GetComponent<Positioned>().GridPos;
 
-			var playerPos = this.poe.Player.GetComponent<Positioned>().GridPos;
-
-			Vec2 rightTopAnchor = new Vec2(miniMapRect.X + miniMapRect.W, clientRect.Y + clientRect.H + 5);
-			
+			Vec2 rightTopAnchor = mountPoints[UiMountPoint.UnderMinimap];
 			int y = rightTopAnchor.Y;
-			int fontSize = Settings.GetInt("ItemAlert.ShowText.FontSize");
+			int fontSize = Settings.TextFontSize;
 			
-			const int vMargin = 2;
-			foreach (KeyValuePair<ExileBot.Entity, AlertDrawStyle> kv in this.currentAlerts)
+			const int VMargin = 2;
+			foreach (KeyValuePair<EntityWrapper, AlertDrawStyle> kv in currentAlerts.Where(a => a.Key.IsValid))
 			{
-				if (!kv.Key.IsValid) continue;
-
 				string text = GetItemName(kv);
 				if( null == text ) continue;
 
@@ -143,9 +158,25 @@ namespace PoeHUD.Hud.Loot
 
 				Vec2 vPadding = new Vec2(5, 2);
 				Vec2 itemDrawnSize = drawItem(rc, kv.Value, delta, rightTopAnchor.X, y, vPadding, text, fontSize);
-				y += itemDrawnSize.Y + vMargin;
+				y += itemDrawnSize.Y + VMargin;
 			}
 			
+		}
+
+		public IEnumerable<MapIcon> GetIcons()
+		{
+			List<EntityWrapper> toRemove = new List<EntityWrapper>();
+			foreach (KeyValuePair<EntityWrapper, AlertDrawStyle> kv in currentAlerts)
+			{
+				if (kv.Value.IconForMap.IsEntityStillValid())
+					yield return kv.Value.IconForMap;
+				else
+					toRemove.Add(kv.Key);
+			}
+			foreach (EntityWrapper wrapper in toRemove)
+			{
+				currentAlerts.Remove(wrapper);
+			}
 		}
 
 		private static Vec2 drawItem(RenderingContext rc, AlertDrawStyle drawStyle, Vec2 delta, int x, int y, Vec2 vPadding, string text,
@@ -156,13 +187,9 @@ namespace PoeHUD.Hud.Loot
 			vPadding.Y -= drawStyle.FrameWidth;
 			// item will appear to have equal size
 
-			double distance = Math.Sqrt(delta.X * delta.X + delta.Y * delta.Y);
-			double phi = Math.Acos(delta.X / distance);
-			if (delta.Y < 0) 
-				phi = 2 * Math.PI - phi;
-			phi += Math.PI * 0.25; // fix roration due to projection
-			if (phi > 2 * Math.PI) 
-				phi -= 2*Math.PI;
+			double phi;
+			var distance = delta.GetPolarCoordinates(out phi);
+
 
 			//text = text + " @ " + (int)distance + " : " + (int)(phi / Math.PI * 180)  + " : " + xSprite;
 
@@ -174,13 +201,10 @@ namespace PoeHUD.Hud.Loot
 
 			int fullHeight = vTextSize.Y + 2 * vPadding.Y + 2 * drawStyle.FrameWidth;
 			int fullWidth = vTextSize.X + 2 * vPadding.X + iconSize + 2 * drawStyle.FrameWidth + compassOffset;
-			rc.AddBox(new Rect(x - fullWidth, y, fullWidth, fullHeight), Color.FromArgb(180, 0, 0, 0));
+			rc.AddBox(new Rect(x - fullWidth, y, fullWidth - compassOffset, fullHeight), Color.FromArgb(180, 0, 0, 0));
 
-			float xSprite = (float)Math.Round(phi / Math.PI * 4);
-			if (xSprite >= 8) xSprite = 0;
-			float ySprite = distance > 60 ? distance > 120 ? 2 : 1 : 0;
-			rc.AddSprite("directions.png", new Rect(x - vPadding.X - compassOffset + 6, y + vPadding.Y, vTextSize.Y, vTextSize.Y),
-				new RectUV(xSprite / 8, ySprite / 3, (xSprite + 1) / 8, (ySprite + 1) / 3));
+			var rectUV = GetDirectionsUv(phi, distance);
+			rc.AddSprite("directions.png", new Rect(x - vPadding.X - compassOffset + 6, y + vPadding.Y, vTextSize.Y, vTextSize.Y), rectUV);
 
 			if (iconSize > 0)
 			{
@@ -198,10 +222,10 @@ namespace PoeHUD.Hud.Loot
 			return new Vec2(fullWidth, fullHeight);
 		}
 
-		private string GetItemName(KeyValuePair<ExileBot.Entity, AlertDrawStyle> kv)
+		private string GetItemName(KeyValuePair<EntityWrapper, AlertDrawStyle> kv)
 		{
 			string text;
-			EntityLabel labelFromEntity = this.poe.GetLabelFromEntity(kv.Key);
+			EntityLabel labelFromEntity = model.GetLabelForEntity(kv.Key);
 
 			if (labelFromEntity == null)
 			{
@@ -217,70 +241,15 @@ namespace PoeHUD.Hud.Loot
 			return text;
 		}
 
-		private Dictionary<string, CraftingBase> LoadCraftingBases()
+		private HashSet<string> LoadCurrency(string fileName)
 		{
-			if (!File.Exists("config/crafting_bases.txt"))
-			{
-				return new Dictionary<string, CraftingBase>();
-			}
-			Dictionary<string, CraftingBase> dictionary = new Dictionary<string, CraftingBase>(StringComparer.OrdinalIgnoreCase);
-			List<string> parseErrors = new List<string>();
-			string[] array = File.ReadAllLines("config/crafting_bases.txt");
-			foreach (
-				string text2 in
-					array.Select(text => text.Trim()).Where(text2 => !string.IsNullOrWhiteSpace(text2) && !text2.StartsWith("#")))
-			{
-				string[] parts = text2.Split(new[]{','});
-				string itemName = parts[0].Trim();
-
-				CraftingBase item = new CraftingBase() {Name = itemName};
-
-				int tmpVal = 0;
-				if (parts.Length > 1 && int.TryParse(parts[1], out tmpVal))
-					item.MinItemLevel = tmpVal;
-
-				if (parts.Length > 2 && int.TryParse(parts[2], out tmpVal))
-					item.MinQuality = tmpVal;
-
-				const int RarityPosition = 3;
-				if (parts.Length > RarityPosition)
-				{
-					item.Rarities = new ItemRarity[parts.Length - 3];
-					for (int i = RarityPosition; i < parts.Length; i++)
-					{
-						if (!Enum.TryParse(parts[i], true, out item.Rarities[i - RarityPosition]))
-						{
-							parseErrors.Add("Incorrect rarity definition at line: " + text2);
-							item.Rarities = null;
-						}
-					}
-				}
-
-				if( !dictionary.ContainsKey(itemName))
-					dictionary.Add(itemName, item);
-				else
-					parseErrors.Add("Duplicate definition for item was ignored: " + text2);
-			}
-
-			if(parseErrors.Any())
-				throw new Exception("Error parsing config/crafting_bases.txt \r\n" + string.Join(Environment.NewLine, parseErrors) + Environment.NewLine + Environment.NewLine);
-
-			return dictionary;
-		}
-		private HashSet<string> LoadCurrency()
-		{
-			if (!File.Exists("config/currency.txt"))
+			if (!File.Exists(fileName))
 				return null;
 			HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			string[] array = File.ReadAllLines("config/currency.txt");
-			for (int i = 0; i < array.Length; i++)
+			string[] array = File.ReadAllLines(fileName);
+			foreach (string text2 in array.Where(text2 => !string.IsNullOrWhiteSpace(text2)))
 			{
-				string text = array[i];
-				string text2 = text.Trim();
-				if (!string.IsNullOrWhiteSpace(text2))
-				{
-					hashSet.Add(text2.ToLowerInvariant());
-				}
+				hashSet.Add(text2.Trim().ToLowerInvariant());
 			}
 			return hashSet;
 		}

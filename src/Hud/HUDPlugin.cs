@@ -1,19 +1,55 @@
-using PoeHUD.ExileBot;
+using System;
+using System.Collections.Generic;
+using PoeHUD.Controllers;
+using PoeHUD.Framework;
+using PoeHUD.Hud.Icons;
+using PoeHUD.Settings;
 
 namespace PoeHUD.Hud
 {
-	public abstract class HUDPlugin
+	public interface HUDPlugin
 	{
-		protected PathOfExile poe;
-		protected OverlayRenderer overlay;
-		public void Init(PathOfExile poe, OverlayRenderer overlay)
+		void Init(GameController poe);
+		void OnEnable();
+		void OnDisable();
+		void OnAreaChange(AreaController area);
+
+		SettingsForModule SettingsNode { get; }
+
+		void Render(RenderingContext rc, Dictionary<UiMountPoint, Vec2> mountPoints);
+	}
+
+	public interface HUDPluginWithMapIcons : HUDPlugin
+	{
+		IEnumerable<MapIcon> GetIcons();
+	}
+
+	public abstract class HUDPluginBase : HUDPlugin
+	{
+		protected GameController model;
+		public void Init(GameController poe)
 		{
-			this.poe = poe;
-			this.overlay = overlay;
+			this.model = poe;
 			this.OnEnable();
 		}
-		public abstract void OnEnable();
-		public abstract void Render(RenderingContext rc);
-		public abstract void OnDisable();
+		public virtual void OnEnable() { }
+		public virtual void OnDisable() { }
+		public virtual void OnAreaChange(AreaController area) { }
+		public abstract SettingsForModule SettingsNode { get; }
+
+		public abstract void Render(RenderingContext rc, Dictionary<UiMountPoint, Vec2> mountPoints);
+
+		// could not fing a better place yet
+		protected static RectUV GetDirectionsUv(double phi, double distance)
+		{
+			phi += Math.PI * 0.25; // fix roration due to projection
+			if (phi > 2 * Math.PI)
+				phi -= 2 * Math.PI;
+			float xSprite = (float)Math.Round(phi / Math.PI * 4);
+			if (xSprite >= 8) xSprite = 0;
+			float ySprite = distance > 60 ? distance > 120 ? 2 : 1 : 0;
+			var rectUV = new RectUV(xSprite / 8, ySprite / 3, (xSprite + 1) / 8, (ySprite + 1) / 3);
+			return rectUV;
+		}
 	}
 }

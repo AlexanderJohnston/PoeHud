@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using PoeHUD.ExileBot;
+using PoeHUD.Controllers;
 
 namespace PoeHUD.Poe
 {
@@ -9,14 +9,14 @@ namespace PoeHUD.Poe
 		{
 			get
 			{
-				return this.m.ReadInt(this.address + 112);
+				return this.M.ReadInt(this.Address + 112);
 			}
 		}
 		private int ListEnd
 		{
 			get
 			{
-				return this.m.ReadInt(this.address + 116);
+				return this.M.ReadInt(this.Address + 116);
 			}
 		}
 		public int InventoryCount
@@ -43,13 +43,13 @@ namespace PoeHUD.Poe
 				return list;
 			}
 		}
-        public Inventory this[InventoryIndex inv]
-        {
-            get
-            {
-                int num = (int)inv;
-                return base.ReadObject<Inventory>((this.ListStart + 8) + (num * 0x10));
-            }
-        }
+		public Inventory this[InventorySlotType inv]
+		{
+			get
+			{
+				int num = (int)inv;
+				return base.ReadObject<Inventory>((this.ListStart + 8) + (num * 0x10));
+			}
+		}
 	}
 }

@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using PoeHUD.ExileBot;
 using PoeHUD.Poe;
 
 namespace PoeHUD.Framework
@@ -13,8 +12,8 @@ namespace PoeHUD.Framework
 	{
 		public readonly int BaseAddress;
 		private bool closed;
-		private IntPtr procHandle;
-		private Dictionary<string, int> modules;
+		private IntPtr hProcess;
+		private readonly Dictionary<string, int> modules;
 		public Offsets offsets;
 		public Process Process { get; private set; }
 		public Memory(Offsets offs, int pId)
@@ -28,11 +27,11 @@ namespace PoeHUD.Framework
 
 		public void Dispose()
 		{
-			this.Close();
-		}
-		~Memory()
-		{
-			this.Close();
+			if (!this.closed)
+			{
+				this.closed = true;
+				Imports.CloseHandle(this.hProcess);
+			}
 		}
 
 		protected Offsets Offsets { get { return this.offsets; } }
@@ -68,6 +67,16 @@ namespace PoeHUD.Framework
 		{
 			return BitConverter.ToSingle(this.ReadMem(addr, 4), 0);
 		}
+		public float[] ReadFloatArray(int addr, int size)
+		{
+			var bytes = this.ReadMem(addr, 4 * size);
+			var result = new float[size];
+			for(int i = 0; i < size; i++) {
+				result[i] = BitConverter.ToSingle(bytes, 4 * size);
+			}
+			return result;
+		}
+
 		public long ReadLong(int addr)
 		{
 			return BitConverter.ToInt64(this.ReadMem(addr, 8), 0);
@@ -103,7 +112,10 @@ namespace PoeHUD.Framework
 			{
 				return string.Empty;
 			}
-			string @string = Encoding.Unicode.GetString(this.ReadMem(addr, length));
+			byte[] mem = this.ReadMem(addr, length);
+			if (mem[0] == 0 && mem[1] == 0)
+				return string.Empty;
+			string @string = Encoding.Unicode.GetString(mem);
 			if (replaceNull)
 			{
 				int num = @string.IndexOf('\0');
@@ -147,33 +159,24 @@ namespace PoeHUD.Framework
 		{
 			this.WriteMem(addr, BitConverter.GetBytes(value));
 		}
-		public void WriteBytes(int addr, byte[] bytes)
+		public void WriteBytes(int addr, params byte[] bytes)
 		{
 			this.WriteMem(addr, bytes);
 		}
 		private void Open()
 		{
-			this.procHandle = Imports.OpenProcess(2035711u, false, this.Process.Id);
-		}
-		private bool Close()
-		{
-			if (!this.closed)
-			{
-				this.closed = true;
-				return Imports.CloseHandle(this.procHandle) != 0;
-			}
-			return true;
+			this.hProcess = Imports.OpenProcess(2035711u, false, this.Process.Id);
 		}
 		private byte[] ReadMem(int addr, int size)
 		{
 			byte[] array = new byte[size];
-			Imports.ReadProcessMemory(this.procHandle, (IntPtr)addr, array, size, 0);
+			Imports.ReadProcessMemory(this.hProcess, (IntPtr)addr, array, size, 0);
 			return array;
 		}
 		private void WriteMem(int addr, byte[] data)
 		{
 			int num = 0;
-			if (!Imports.WriteProcessMemory(this.procHandle, new IntPtr(addr), data, (uint)data.Length, out num))
+			if (!Imports.WriteProcessMemory(this.hProcess, new IntPtr(addr), data, (uint)data.Length, out num))
 			{
 				Console.WriteLine(string.Concat(new object[]
 				{
@@ -187,7 +190,7 @@ namespace PoeHUD.Framework
 		public void MakeMemoryWriteable(int addr, int length)
 		{
 			uint num = 0u;
-			if (!Memory.VirtualProtectEx(this.procHandle, new IntPtr(addr), new IntPtr(length), 64u, ref num))
+			if (!Memory.VirtualProtectEx(this.hProcess, new IntPtr(addr), new IntPtr(length), 64u, ref num))
 			{
 				Console.WriteLine("VirtualProtectEx failed! " + Marshal.GetLastWin32Error());
 			}
@@ -209,7 +212,7 @@ namespace PoeHUD.Framework
 				{
 					if (this.CompareData(pattern, exeImage, offset)) {
 						address[iPattern] = offset;
-						Console.WriteLine("Pattern " + iPattern + " is found");
+						Console.WriteLine("Pattern " + iPattern + " is found at " + (this.BaseAddress + offset).ToString("X"));
 						break;
 					}
 				}
