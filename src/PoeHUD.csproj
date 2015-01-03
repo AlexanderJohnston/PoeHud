@@ -131,6 +131,7 @@
     <Compile Include="Poe\UI\Inventory.cs" />
     <Compile Include="Poe\UI\InventoryItemIcon.cs" />
     <Compile Include="Poe\UI\ItemContainer.cs" />
+    <Compile Include="Poe\UI\ItemsOnGroundLabelElement.cs" />
     <Compile Include="Poe\UI\Label.cs" />
     <Compile Include="Poe\UI\Tooltip.cs" />
     <Compile Include="Poe\EntityComponents\Positioned.cs" />

@@ -1,5 +1,6 @@
 using PoeHUD.Framework;
 using PoeHUD.Poe.UI;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace PoeHUD.Poe
@@ -106,7 +107,7 @@ namespace PoeHUD.Poe
 
 		public BigMinimap Minimap { get { return ReadObjectAt<BigMinimap>(0x12C); } }
 
-		public Element ItemsOnGroundLabels { get { return ReadObjectAt<Element>(0x130); } }
+		//public Element ItemsOnGroundLabels { get { return ReadObjectAt<Element>(0x130); } }
 
 		public Element MonsterHpLabels { get { return ReadObjectAt<Element>(0x134); } }
 
@@ -135,6 +136,14 @@ namespace PoeHUD.Poe
 
 		public Element ItemOnGroundTooltip { get { return ReadObjectAt<Element>(0x210); } }
 
+		public IEnumerable<ItemsOnGroundLabelElement> ItemsOnGroundLabels
+		{
+			get
+			{
+				var itemsOnGroundLabelRoot = ReadObjectAt<ItemsOnGroundLabelElement>(16 + 0x120);
+				return itemsOnGroundLabelRoot.Children;
+			}
+		}
 
 		public Vec2 GetRightTopLeftOfMinimap()
 		{

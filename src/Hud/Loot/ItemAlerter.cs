@@ -146,12 +146,20 @@ namespace PoeHUD.Hud.Loot
 			Vec2 rightTopAnchor = mountPoints[UiMountPoint.UnderMinimap];
 			int y = rightTopAnchor.Y;
 			int fontSize = Settings.TextFontSize;
-			
+			var itemsOnGroundLabels = model.Internal.IngameState.IngameUi.ItemsOnGroundLabels;
+
 			const int VMargin = 2;
 			foreach (KeyValuePair<EntityWrapper, AlertDrawStyle> kv in currentAlerts.Where(a => a.Key.IsValid))
 			{
 				string text = GetItemName(kv);
 				if( null == text ) continue;
+
+				var element = itemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == kv.Key.Address);
+				if (element != null)
+				{
+					var rect = element.Label.GetClientRect();
+					rc.AddFrame(rect, Color.Red, 1);
+				}
 
 				Vec2 itemPos = kv.Key.GetComponent<Positioned>().GridPos;
 				var delta = itemPos - playerPos;
