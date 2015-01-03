@@ -154,7 +154,7 @@ namespace PoeHUD.Hud.Loot
 				string text = GetItemName(kv);
 				if( null == text ) continue;
 
-				var element = itemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == kv.Key.Address);
+				var element = itemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == kv.Key.Address && z.Label.IsVisible);
 				if (element != null)
 				{
 					var rect = element.Label.GetClientRect();
