@@ -26,6 +26,7 @@ namespace PoeHUD.Hud.Loot
 			public Setting<bool> PlaySound = new Setting<bool>("Play Sound", true);
 			public Setting<bool> AlertOfCraftingBases = new Setting<bool>("Crafting Bases", true);
 			public Setting<bool> ShowText = new Setting<bool>("Show Text", true);
+			public Setting<bool> ShowBorder = new Setting<bool>("Show Border", true);
 			public SettingIntRange TextFontSize = new SettingIntRange("Font Size", 7, 30, 14);
 			public Setting<bool> AlertOfRares = new Setting<bool>("Rares", true);
 			public Setting<bool> AlertOfUniques = new Setting<bool>("Uniques", true);
@@ -139,7 +140,7 @@ namespace PoeHUD.Hud.Loot
 		}
 		public override void Render(RenderingContext rc, Dictionary<UiMountPoint, Vec2> mountPoints)
 		{
-			if (!Settings.ShowText) return;
+			if (!Settings.ShowText && !Settings.ShowBorder) return;
 
 			var playerPos = model.Player.GetComponent<Positioned>().GridPos;
 
@@ -154,19 +155,25 @@ namespace PoeHUD.Hud.Loot
 				string text = GetItemName(kv);
 				if( null == text ) continue;
 
-				var element = itemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == kv.Key.Address && z.Label.IsVisible);
-				if (element != null)
+				if (Settings.ShowBorder)
 				{
-					var rect = element.Label.GetClientRect();
-					rc.AddFrame(rect, Color.Red, 1);
+					var element = itemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == kv.Key.Address && z.Label.IsVisible);
+					if (element != null)
+					{
+						var rect = element.Label.GetClientRect();
+						rc.AddFrame(rect, Color.Red, 1);
+					}
 				}
 
-				Vec2 itemPos = kv.Key.GetComponent<Positioned>().GridPos;
-				var delta = itemPos - playerPos;
+				if (Settings.ShowText)
+				{
+					Vec2 itemPos = kv.Key.GetComponent<Positioned>().GridPos;
+					var delta = itemPos - playerPos;
 
-				Vec2 vPadding = new Vec2(5, 2);
-				Vec2 itemDrawnSize = drawItem(rc, kv.Value, delta, rightTopAnchor.X, y, vPadding, text, fontSize);
-				y += itemDrawnSize.Y + VMargin;
+					Vec2 vPadding = new Vec2(5, 2);
+					Vec2 itemDrawnSize = drawItem(rc, kv.Value, delta, rightTopAnchor.X, y, vPadding, text, fontSize);
+					y += itemDrawnSize.Y + VMargin;
+				}
 			}
 			
 		}
