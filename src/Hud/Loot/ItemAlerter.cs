@@ -17,6 +17,7 @@ namespace PoeHUD.Hud.Loot
 	{
 		private HashSet<long> playedSoundsCache;
 		private Dictionary<EntityWrapper, AlertDrawStyle> currentAlerts;
+		private List<ItemsOnGroundLabelElement> groundItemLabels;
 
 		private Dictionary<string, CraftingBase> craftingBases;
 		private HashSet<string> currencyNames;
@@ -26,7 +27,7 @@ namespace PoeHUD.Hud.Loot
 			public Setting<bool> PlaySound = new Setting<bool>("Play Sound", true);
 			public Setting<bool> AlertOfCraftingBases = new Setting<bool>("Crafting Bases", true);
 			public Setting<bool> ShowText = new Setting<bool>("Show Text", true);
-			public Setting<bool> ShowBorder = new Setting<bool>("Show Border", true);
+			public ShowBorderSetting ShowBorder = new ShowBorderSetting("Show Border", true);
 			public SettingIntRange TextFontSize = new SettingIntRange("Font Size", 7, 30, 14);
 			public Setting<bool> AlertOfRares = new Setting<bool>("Rares", true);
 			public Setting<bool> AlertOfUniques = new Setting<bool>("Uniques", true);
@@ -37,6 +38,54 @@ namespace PoeHUD.Hud.Loot
 			public Setting<bool> AlertOfCurrency = new Setting<bool>("Currency", true);
 			
 			public ItemAlertSettings() : base("Item Alert") {}
+		}
+
+		public class ShowBorderSetting : SettingsForModule
+		{
+			public ShowBorderSetting(string name, bool enabled = true) : base(name)
+			{
+				Enabled.Value = enabled;
+			}
+
+			public SettingColor Color = new SettingColor("Color");
+			public SettingIntRange Thickness = new SettingIntRange("Thickness", 0, 3, 1);
+
+			public ShowBorderGroupSetting Customize = new ShowBorderGroupSetting("Customize", false);
+		}
+
+		public class ShowBorderGroupSetting : SettingsForModule
+		{
+			public ShowBorderGroupSetting(string name, bool enabled = false) : base(name)
+			{
+				Enabled.Value = enabled;
+			}
+
+			public List<ShowBorderCustomizeSetting> GetSettings()
+			{
+				return new List<ShowBorderCustomizeSetting>() { this.Currency, this.Amulets, this.Belts, this.BodyArmours, this.Boots, this.Gloves, this.Helmets, this.Rings, this.Shields, this.Weapons };
+			}
+
+			public ShowBorderCustomizeSetting Currency = new ShowBorderCustomizeSetting("Currency", false);
+			public ShowBorderCustomizeSetting Amulets = new ShowBorderCustomizeSetting("Amulets", false);
+			public ShowBorderCustomizeSetting Belts = new ShowBorderCustomizeSetting("Belts", false);
+			public ShowBorderCustomizeSetting BodyArmours = new ShowBorderCustomizeSetting("BodyArmours", false);
+			public ShowBorderCustomizeSetting Boots = new ShowBorderCustomizeSetting("Boots", false);
+			public ShowBorderCustomizeSetting Gloves = new ShowBorderCustomizeSetting("Gloves", false);
+			public ShowBorderCustomizeSetting Helmets = new ShowBorderCustomizeSetting("Helmets", false);
+			public ShowBorderCustomizeSetting Rings = new ShowBorderCustomizeSetting("Rings", false);
+			public ShowBorderCustomizeSetting Shields = new ShowBorderCustomizeSetting("Shields", false);
+			public ShowBorderCustomizeSetting Weapons = new ShowBorderCustomizeSetting("Weapons", false);
+		}
+
+		public class ShowBorderCustomizeSetting : SettingsForModule
+		{
+			public ShowBorderCustomizeSetting(string name, bool enabled = false) : base(name)
+			{
+				Enabled.Value = enabled;
+			}
+
+			public SettingColor Color = new SettingColor("Color");
+			public SettingIntRange Thickness = new SettingIntRange("Thickness", 0, 3, 1);
 		}
 
 		public class MinQualitySetting : SettingsForModule
@@ -62,6 +111,7 @@ namespace PoeHUD.Hud.Loot
 		public override void OnEnable()
 		{
 			playedSoundsCache = new HashSet<long>();
+			groundItemLabels = new List<ItemsOnGroundLabelElement>();
 			currentAlerts = new Dictionary<EntityWrapper, AlertDrawStyle>();
 			currencyNames = LoadCurrency("config/currency.txt");
 			craftingBases = CraftingBase.LoadFromFile("config/crafting_bases.txt");
@@ -75,6 +125,7 @@ namespace PoeHUD.Hud.Loot
 		public void EntityRemoved(EntityWrapper entity)
 		{
 			currentAlerts.Remove(entity);
+			groundItemLabels.RemoveAll(e => e.ItemOnGround.Address == entity.Address);
 		}
 
 		public void EntityAdded(EntityWrapper entity)
@@ -98,6 +149,12 @@ namespace PoeHUD.Hud.Loot
 			{
 				playedSoundsCache.Add(entity.LongId);
 				drawStyle.soundToPlay.Play();
+			}
+
+			ItemsOnGroundLabelElement labeledItem = model.Internal.IngameState.IngameUi.ItemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == entity.Address);
+			if(labeledItem != null)
+			{
+				groundItemLabels.Add(labeledItem);
 			}
 		}
 
@@ -157,11 +214,28 @@ namespace PoeHUD.Hud.Loot
 
 				if (Settings.ShowBorder)
 				{
-					var element = itemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == kv.Key.Address && z.Label.IsVisible);
-					if (element != null)
+					if (groundItemLabels.Any(labeledItem => labeledItem.ItemOnGround.Address == kv.Key.Address && labeledItem.Label.IsVisible))
 					{
-						var rect = element.Label.GetClientRect();
-						rc.AddFrame(rect, Color.Red, 1);
+						var rect = groundItemLabels.First(labeledItem => labeledItem.ItemOnGround.Address == kv.Key.Address).Label.GetClientRect();
+						int thickness = Settings.ShowBorder.Thickness.Value;
+						Color color = Settings.ShowBorder.Color.FromRGB;
+
+						if(Settings.ShowBorder.Customize.Enabled)
+						{
+							Entity e = kv.Key.GetComponent<WorldItem>().ItemEntity;
+							foreach(ShowBorderCustomizeSetting type in Settings.ShowBorder.Customize.GetSettings())
+							{
+								if(e.Path.Contains(type.BlockName) && type.Enabled)
+								{
+									thickness = type.Thickness.Value;
+									color = type.Color.FromRGB;
+									break;
+								}
+							}
+						}
+						
+						if(thickness > 0)
+							rc.AddFrame(rect, color, thickness);
 					}
 				}
 
