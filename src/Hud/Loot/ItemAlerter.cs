@@ -62,9 +62,10 @@ namespace PoeHUD.Hud.Loot
 
 			public List<ShowBorderCustomizeSetting> GetSettings()
 			{
-				return new List<ShowBorderCustomizeSetting>() { this.Currency, this.Amulets, this.Belts, this.BodyArmours, this.Boots, this.Gloves, this.Helmets, this.Rings, this.Shields, this.Weapons };
+				return new List<ShowBorderCustomizeSetting>() { this.CraftingBases, this.Currency, this.Amulets, this.Belts, this.BodyArmours, this.Boots, this.Gloves, this.Helmets, this.Rings, this.Shields, this.Uniques, this.Weapons };
 			}
 
+			public ShowBorderCustomizeSetting CraftingBases = new ShowBorderCustomizeSetting("CraftingBases", false);
 			public ShowBorderCustomizeSetting Currency = new ShowBorderCustomizeSetting("Currency", false);
 			public ShowBorderCustomizeSetting Amulets = new ShowBorderCustomizeSetting("Amulets", false);
 			public ShowBorderCustomizeSetting Belts = new ShowBorderCustomizeSetting("Belts", false);
@@ -74,17 +75,19 @@ namespace PoeHUD.Hud.Loot
 			public ShowBorderCustomizeSetting Helmets = new ShowBorderCustomizeSetting("Helmets", false);
 			public ShowBorderCustomizeSetting Rings = new ShowBorderCustomizeSetting("Rings", false);
 			public ShowBorderCustomizeSetting Shields = new ShowBorderCustomizeSetting("Shields", false);
+			public ShowBorderCustomizeSetting Uniques = new ShowBorderCustomizeSetting("Uniques", false, 175, 96, 37);
 			public ShowBorderCustomizeSetting Weapons = new ShowBorderCustomizeSetting("Weapons", false);
 		}
 
 		public class ShowBorderCustomizeSetting : SettingsForModule
 		{
-			public ShowBorderCustomizeSetting(string name, bool enabled = false) : base(name)
+			public ShowBorderCustomizeSetting(string name, bool enabled = false, int red = 255, int green = 255, int blue = 255) : base(name)
 			{
 				Enabled.Value = enabled;
+				this.Color = new SettingColor("Color", red, green, blue);
 			}
 
-			public SettingColor Color = new SettingColor("Color");
+			public SettingColor Color;
 			public SettingIntRange Thickness = new SettingIntRange("Thickness", 0, 3, 1);
 		}
 
@@ -225,6 +228,18 @@ namespace PoeHUD.Hud.Loot
 							Entity e = kv.Key.GetComponent<WorldItem>().ItemEntity;
 							foreach(ShowBorderCustomizeSetting type in Settings.ShowBorder.Customize.GetSettings())
 							{
+								if(type.BlockName.Equals("Uniques") && type.Enabled && e.GetComponent<Mods>().ItemRarity.Equals(Game.Rarity.Unique))
+								{
+									thickness = type.Thickness.Value;
+									color = type.Color.FromRGB;
+									break;
+								}
+								if(type.BlockName.Equals("CraftingBases") && type.Enabled && kv.Value.IconIndex.Equals(2))
+								{
+									thickness = type.Thickness.Value;
+									color = type.Color.FromRGB;
+									break;
+								}
 								if(e.Path.Contains(type.BlockName) && type.Enabled)
 								{
 									thickness = type.Thickness.Value;
