@@ -62,7 +62,7 @@ namespace PoeHUD.Hud.Loot
 
 			public List<ShowBorderCustomizeSetting> GetSettings()
 			{
-				return new List<ShowBorderCustomizeSetting>() { this.CraftingBases, this.Currency, this.Amulets, this.Belts, this.BodyArmours, this.Boots, this.Gloves, this.Helmets, this.Rings, this.Shields, this.Uniques, this.Weapons };
+				return new List<ShowBorderCustomizeSetting>() { this.Uniques, this.CraftingBases, this.Currency, this.Amulets, this.Belts, this.BodyArmours, this.Boots, this.Gloves, this.Helmets, this.Rings, this.Shields, this.Weapons };
 			}
 
 			public ShowBorderCustomizeSetting CraftingBases = new ShowBorderCustomizeSetting("CraftingBases", false);
@@ -217,6 +217,14 @@ namespace PoeHUD.Hud.Loot
 
 				if (Settings.ShowBorder)
 				{
+					if (!groundItemLabels.Any(labeledItem => labeledItem.ItemOnGround.Address == kv.Key.Address))
+					{
+						ItemsOnGroundLabelElement labeledItem = model.Internal.IngameState.IngameUi.ItemsOnGroundLabels.FirstOrDefault(z => z.ItemOnGround.Address == kv.Key.Address);
+						if (labeledItem != null)
+						{
+							groundItemLabels.Add(labeledItem);
+						}
+					}
 					if (groundItemLabels.Any(labeledItem => labeledItem.ItemOnGround.Address == kv.Key.Address && labeledItem.Label.IsVisible))
 					{
 						var rect = groundItemLabels.First(labeledItem => labeledItem.ItemOnGround.Address == kv.Key.Address).Label.GetClientRect();
