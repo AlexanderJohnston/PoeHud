@@ -1,3 +1,4 @@
+using System.Drawing;
 namespace PoeHUD.Framework
 {
 	public struct Rect
@@ -38,6 +39,12 @@ namespace PoeHUD.Framework
 		public Rect Expand(int xd, int yd)
 		{
 			return new Rect(X - xd, Y - yd, W + xd, H + yd);
+		}
+		public bool IntersectsWith(Rect rect)
+		{
+			Rectangle r1 = new Rectangle(X, Y, W, H);
+			Rectangle r2 = new Rectangle(rect.X, rect.Y, rect.W, rect.H);
+			return r1.IntersectsWith(r2);
 		}
 		public Rect Adjust(int width, int height)
 		{

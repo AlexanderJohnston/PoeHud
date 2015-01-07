@@ -111,6 +111,8 @@ namespace PoeHUD.Hud.Menu
 			{
 				if( setting is Setting<bool>)
 					parent.AddChild(new BooleanButton(Settings, setting.Key, setting as Setting<bool>));
+				else if (setting is Setting<Color>)
+					parent.AddChild(new ColorPicker(Settings, setting.Key, setting as Setting<Color>));
 				else if (setting is SettingsBlock)
 				{
 					var sm = setting as SettingsForModule;

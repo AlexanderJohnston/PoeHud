@@ -54,6 +54,7 @@
     <Compile Include="Hud\DPS\FpsMeter.cs" />
     <Compile Include="Hud\IdcScriptMaker.cs" />
     <Compile Include="Hud\Loot\ItemSettings.cs" />
+    <Compile Include="Hud\Menu\ColorPicker.cs" />
     <Compile Include="Poe\EntityComponents\Base.cs" />
     <Compile Include="Poe\EntityComponents\Charges.cs" />
     <Compile Include="Poe\EntityComponents\ComponentNames.cs" />

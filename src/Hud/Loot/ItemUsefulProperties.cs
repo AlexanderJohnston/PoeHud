@@ -75,6 +75,10 @@ namespace PoeHUD.Hud.Loot
 				iconIndex = 2;
 			if (NumLinks == 6)
 				iconIndex = 3;
+			if (NumLinks == 5)
+				iconIndex = 4;
+			if (NumSockets == 6 && NumLinks == 5)
+				iconIndex = 5;
 
 			return new AlertDrawStyle()
 			{

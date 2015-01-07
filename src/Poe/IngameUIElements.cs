@@ -93,17 +93,17 @@ namespace PoeHUD.Poe
 
 		public Element StashPanel { get { return ReadObjectAt<Element>(0x104); } }
 
-		public Element SocialPanel { get { return ReadObjectAt<Element>(8+0x104); } }
+		public Element SocialPanel { get { return ReadObjectAt<Element>(0x110); } }
 
-		public Element TreePanel { get { return ReadObjectAt<Element>(8+0x108); } }
+		public Element TreePanel { get { return ReadObjectAt<Element>(0x114); } }
 
-		public Element CharacterPanel { get { return ReadObjectAt<Element>(8+0x10C); } }
+		public Element CharacterPanel { get { return ReadObjectAt<Element>(0x118); } }
 
-		public Element OptionsPanel { get { return ReadObjectAt<Element>(8+0x110); } }
+		public Element OptionsPanel { get { return ReadObjectAt<Element>(0x11C); } }
 
-		public Element AchievementsPanel { get { return ReadObjectAt<Element>(8+0x114); } }
+		public Element AchievementsPanel { get { return ReadObjectAt<Element>(0x120); } }
 
-		public Element WorldPanel { get { return ReadObjectAt<Element>(8+0x118); } }
+		public Element WorldPanel { get { return ReadObjectAt<Element>(0x128); } }
 
 		public BigMinimap Minimap { get { return ReadObjectAt<BigMinimap>(0x12C); } }
 

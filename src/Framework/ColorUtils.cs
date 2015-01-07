@@ -42,5 +42,22 @@ namespace PoeHUD.Framework
 					return Color.FromArgb(255, v, p, q);
 			}
 		}
+
+		/// <summary>
+		/// Returns the value for the requested primary color from the Color object.
+		/// </summary>
+		/// <param name="primaryColor">The primary color to return a value for.  Must be one of: Color.Red, Color.Green, Color.Blue.</param>
+		/// <returns>Color value between 0 and 255</returns>
+		public static int PrimaryColorValue(this Color _color, Color primaryColor)
+		{
+			if (primaryColor.Equals(Color.Red))
+				return _color.R;
+			if (primaryColor.Equals(Color.Green))
+				return _color.G;
+			if (primaryColor.Equals(Color.Blue))
+				return _color.B;
+
+			throw new ArgumentOutOfRangeException("Supplied color is not one of the valid colors");
+		}
 	}
 }
